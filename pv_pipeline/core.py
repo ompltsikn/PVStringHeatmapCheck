@@ -37,6 +37,47 @@ class M2Finding:
         return json.dumps(d, ensure_ascii=False)
 
 
+from typing import Iterable, List
+import pandas as pd
+
+
+class SubModule:
+    """Base class for M2 submodules. Override `run()`."""
+    name: str = "base"
+
+    def run(self, combined_df: pd.DataFrame, config: dict) -> List[M2Finding]:
+        raise NotImplementedError
+
+
+class M2Engine:
+    """Minimal orchestrator: jalankan list of SubModule, kumpulkan findings."""
+
+    def __init__(self, submodules: Iterable[SubModule]):
+        self.submodules = list(submodules)
+
+    def run_all(self, combined_df: pd.DataFrame, config: dict) -> List[M2Finding]:
+        findings: List[M2Finding] = []
+        for sm in self.submodules:
+            findings.extend(sm.run(combined_df, config))
+        return findings
+
+    @staticmethod
+    def write_jsonl(findings: List[M2Finding], path: str) -> None:
+        with open(path, "w", encoding="utf-8") as fp:
+            for fin in findings:
+                fp.write(fin.to_jsonl() + "\n")
+
+    @staticmethod
+    def to_summary_df(findings: List[M2Finding]) -> pd.DataFrame:
+        rows = []
+        for f in findings:
+            d = asdict(f)
+            d["severity"] = f.severity.value if isinstance(f.severity, Severity) else f.severity
+            d["timestamp"] = f.timestamp.isoformat() if f.timestamp else None
+            rows.append(d)
+        return pd.DataFrame(rows)
+
+
 if __name__ == "__main__":
     from pv_pipeline.core import Severity
     assert Severity.CRITICAL.value == "CRITICAL"
@@ -62,3 +103,40 @@ if __name__ == "__main__":
     assert '"timestamp": "2026-05-07T12:00:00"' in line
     assert '"pv_string": null' in line
     print("[core] M2Finding smoke OK")
+
+    # M2Engine test
+    import os
+    import tempfile
+    from pv_pipeline.core import SubModule, M2Engine
+    import pandas as pd
+
+    class _DummySM(SubModule):
+        name = "dummy"
+        def run(self, combined_df, config):
+            return [
+                M2Finding(
+                    timestamp=datetime(2026, 5, 7, 12, 0, 0),
+                    inverter_id="WB02-INV01",
+                    pv_string="PV1",
+                    sub_module="dummy",
+                    severity=Severity.HIGH,
+                    value=92.0,
+                    threshold=95.0,
+                    message="dummy",
+                ),
+            ]
+
+    eng = M2Engine([_DummySM()])
+    findings = eng.run_all(pd.DataFrame(), {})
+    assert len(findings) == 1
+    df = M2Engine.to_summary_df(findings)
+    assert df.iloc[0]["severity"] == "HIGH"
+
+    with tempfile.TemporaryDirectory() as td:
+        out = os.path.join(td, "f.jsonl")
+        M2Engine.write_jsonl(findings, out)
+        with open(out, "r", encoding="utf-8") as fp:
+            lines = fp.readlines()
+        assert len(lines) == 1
+        assert '"severity": "HIGH"' in lines[0]
+    print("[core] M2Engine smoke OK")
