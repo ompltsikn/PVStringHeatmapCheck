@@ -4,6 +4,7 @@ Spec: docs/superpowers/specs/2026-05-08-m2e-hybrid-availability-design.md
 """
 from __future__ import annotations
 
+import re
 from datetime import datetime
 from typing import Optional, Tuple
 
@@ -193,6 +194,122 @@ def _compute_inverter_availability(
     return findings
 
 
+_PV_NUM_RE = re.compile(r"PV\s*0*?(\d+)\s+Power\(kW\)", flags=re.I)
+
+
+def _label_to_pv_name(label: str) -> str:
+    """`PV3 Power(kW)` -> `PV3` ; fallback ke label asli."""
+    m = _PV_NUM_RE.search(label)
+    return f"PV{int(m.group(1))}" if m else label
+
+
+def _compute_string_proxy(
+    df: "pd.DataFrame",
+    pv_cols: list,
+    cfg: dict,
+    interval_minutes: float,
+) -> list:
+    """Detect string proxy-down events.
+
+    `df` harus berisi: Inverter_ID, Start Time, _status_class, kolom-kolom di pv_cols.
+    """
+    sp = cfg.get("string_proxy", {})
+    th = cfg.get("severity_thresholds", {})
+    emit_normal = bool(th.get("emit_normal", False))
+    p_zero = float(sp.get("pstr_zero_threshold_kw", 0.1))
+    sib_med_th = float(sp.get("sibling_median_active_kw", 1.0))
+    min_act_pct = float(sp.get("min_active_siblings_pct", 50))
+    debounce = int(sp.get("debounce_consecutive_steps", 2))
+
+    daylight_ts = set(
+        df.loc[df["_status_class"] == "ON", "Start Time"].dropna().unique()
+    )
+    if not daylight_ts:
+        return []
+
+    findings: list = []
+    n_pv_total = len(pv_cols)
+
+    for inv_id, sub in df.groupby("Inverter_ID", sort=True):
+        sub = sub.sort_values("Start Time").reset_index(drop=True)
+        on_mask = (sub["_status_class"] == "ON") & sub["Start Time"].isin(daylight_ts)
+        sub_on = sub[on_mask]
+        if sub_on.empty:
+            continue
+
+        daylight_minutes_inv = float(len(sub_on)) * float(interval_minutes)
+
+        pv_vals = sub_on[pv_cols].astype(float)
+        sib_median = pv_vals.median(axis=1, skipna=True)
+        active_count = (pv_vals > p_zero).sum(axis=1)
+        active_pct = 100.0 * active_count / max(n_pv_total, 1)
+        qualified = (sib_median >= sib_med_th) & (active_pct >= min_act_pct)
+
+        for pv_col in pv_cols:
+            pv_name = _label_to_pv_name(pv_col)
+            pv_series = pv_vals[pv_col]
+            cand = qualified & (pv_series < p_zero)
+            if not cand.any():
+                continue
+
+            cand_arr = cand.to_numpy()
+            run_lens = []
+            run_start_idx = None
+            for i, v in enumerate(cand_arr):
+                if v:
+                    if run_start_idx is None:
+                        run_start_idx = i
+                else:
+                    if run_start_idx is not None:
+                        run_lens.append((run_start_idx, i - 1))
+                        run_start_idx = None
+            if run_start_idx is not None:
+                run_lens.append((run_start_idx, len(cand_arr) - 1))
+
+            qualified_runs = [(a, b) for (a, b) in run_lens if (b - a + 1) >= debounce]
+            if not qualified_runs:
+                continue
+
+            event_minutes_total = sum(
+                (b - a + 1) * float(interval_minutes) for (a, b) in qualified_runs
+            )
+            string_uptime_pct = max(
+                0.0,
+                100.0 - 100.0 * event_minutes_total / max(daylight_minutes_inv, 1e-9),
+            )
+            sev, threshold = _severity_for_uptime(string_uptime_pct, th)
+            if sev == Severity.NORMAL and not emit_normal:
+                continue
+
+            ts_first = sub_on["Start Time"].iloc[qualified_runs[0][0]]
+            ts_last = sub_on["Start Time"].iloc[qualified_runs[-1][1]]
+            ts_dt = ts_first.to_pydatetime() if hasattr(ts_first, "to_pydatetime") else ts_first
+
+            findings.append(M2Finding(
+                timestamp=ts_dt if isinstance(ts_dt, datetime) else datetime.utcnow(),
+                inverter_id=str(inv_id),
+                pv_string=pv_name,
+                sub_module="M2e_string_proxy",
+                severity=sev,
+                value=round(string_uptime_pct, 4),
+                threshold=threshold,
+                message=(
+                    f"{inv_id} {pv_name} proxy-down "
+                    f"{event_minutes_total:.0f}min/{daylight_minutes_inv:.0f}min daylight "
+                    f"({string_uptime_pct:.2f}% uptime)"
+                ),
+                extra={
+                    "event_minutes": round(event_minutes_total, 2),
+                    "daylight_minutes": round(daylight_minutes_inv, 2),
+                    "n_events": len(qualified_runs),
+                    "first_event_ts": ts_first.isoformat() if hasattr(ts_first, "isoformat") else str(ts_first),
+                    "last_event_ts": ts_last.isoformat() if hasattr(ts_last, "isoformat") else str(ts_last),
+                },
+            ))
+
+    return findings
+
+
 if __name__ == "__main__":
     from pv_pipeline.availability import _classify_status
 
@@ -266,3 +383,39 @@ if __name__ == "__main__":
     assert abs(f0.value - 66.6667) < 0.01
     assert f0.extra["downtime_minutes"] == 20
     print("[availability] _compute_inverter_availability smoke OK")
+
+    # _compute_string_proxy test
+    from pv_pipeline.availability import _compute_string_proxy
+
+    times = list(pd.date_range("2026-05-07 10:00", periods=6, freq="5min"))
+    rows = []
+    for t in times:
+        rows.append({"Inverter_ID": "WB02-INV01", "Start Time": t, "_status_class": "ON",
+                     "PV1 Power(kW)": 0.0, "PV2 Power(kW)": 5.0,
+                     "PV3 Power(kW)": 5.5, "PV4 Power(kW)": 4.8})
+    for t in times:
+        rows.append({"Inverter_ID": "WB02-INV02", "Start Time": t, "_status_class": "ON",
+                     "PV1 Power(kW)": 5.0, "PV2 Power(kW)": 5.0,
+                     "PV3 Power(kW)": 5.5, "PV4 Power(kW)": 4.8})
+    df_test = pd.DataFrame(rows)
+    pv_cols = ["PV1 Power(kW)", "PV2 Power(kW)", "PV3 Power(kW)", "PV4 Power(kW)"]
+
+    cfg = {
+        "string_proxy": {
+            "pstr_zero_threshold_kw": 0.1,
+            "sibling_median_active_kw": 1.0,
+            "min_active_siblings_pct": 50,
+            "debounce_consecutive_steps": 2,
+        },
+        "severity_thresholds": {"critical_below": 90, "high_below": 95,
+                                "medium_below": 97, "info_below": 99,
+                                "emit_normal": False},
+    }
+    findings = _compute_string_proxy(df_test, pv_cols=pv_cols, cfg=cfg, interval_minutes=5)
+    assert len(findings) == 1, f"expected 1 string-proxy finding, got {len(findings)}"
+    f0 = findings[0]
+    assert f0.inverter_id == "WB02-INV01"
+    assert f0.pv_string == "PV1"
+    assert f0.severity.value in {"CRITICAL", "HIGH", "MEDIUM", "INFO"}
+    assert f0.extra["n_events"] >= 1
+    print("[availability] _compute_string_proxy smoke OK")
