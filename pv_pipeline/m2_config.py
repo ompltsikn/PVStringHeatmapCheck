@@ -97,3 +97,8 @@ if __name__ == "__main__":
     assert "grid connected" in cfg["m2e"]["inverter_status_map"]["on_grid_keywords"]
     assert cfg["m2e"]["string_proxy"]["pstr_zero_threshold_kw"] == 0.1
     print("[m2_config] defaults smoke OK")
+    # YAML round-trip test
+    cfg2 = load_m2_config("config/m2_config.yaml")
+    assert cfg2["m2e"]["severity_thresholds"]["critical_below"] == 90
+    assert "grid connected" in cfg2["m2e"]["inverter_status_map"]["on_grid_keywords"]
+    print("[m2_config] yaml round-trip OK")

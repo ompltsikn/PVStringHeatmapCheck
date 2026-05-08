@@ -1,0 +1,30 @@
+# Fase 1 — M2e Hybrid Availability config
+# Edited: 2026-05-08 (initial)
+m2e:
+  inverter_status_map:
+    # Substring match (lowercased) terhadap nilai kolom 'Inverter status'.
+    # Nilai di luar mapping akan diberi warning + dianggap UNKNOWN.
+    on_grid_keywords:      ["grid connected", "on-grid", "on grid", "ongrid"]
+    down_keywords:         ["shutdown", "fault", "stopped", "stop", "error"]
+    transitional_keywords: ["standby", "starting", "stopping",
+                            "initializing", "initialization",
+                            "detecting", "detection", "no sunlight"]
+
+  # auto | event | cumulative | status_only
+  shutdown_time_detection: "auto"
+
+  string_proxy:
+    pstr_zero_threshold_kw:     0.1
+    sibling_median_active_kw:   1.0
+    min_active_siblings_pct:    50
+    debounce_consecutive_steps: 2
+
+  severity_thresholds:
+    critical_below: 90
+    high_below:     95
+    medium_below:   97
+    info_below:     99
+    emit_normal:    false
+
+  output_dir: "outputs"
+  show_overlay:  false
