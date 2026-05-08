@@ -9,6 +9,8 @@ from typing import Optional, Tuple
 import numpy as np
 import pandas as pd
 
+from pv_pipeline.core import Severity
+
 
 def _classify_status(status: Optional[str], keymap: dict) -> str:
     """Map raw status string -> {"ON","DOWN","TRANSITIONAL","UNKNOWN"}.
@@ -98,6 +100,28 @@ def _detect_shutdown_time_mode(
     return "STATUS_ONLY", shutdown_series, startup_series
 
 
+def _severity_for_uptime(uptime_pct: float, thresholds: dict) -> Tuple[Severity, float]:
+    """Map uptime_pct -> (Severity, threshold_breached). NaN -> (NORMAL, NaN)."""
+    if uptime_pct is None:
+        return Severity.NORMAL, float("nan")
+    try:
+        v = float(uptime_pct)
+    except Exception:
+        return Severity.NORMAL, float("nan")
+    if v != v:  # NaN
+        return Severity.NORMAL, float("nan")
+
+    if v < float(thresholds.get("critical_below", 90)):
+        return Severity.CRITICAL, float(thresholds.get("critical_below", 90))
+    if v < float(thresholds.get("high_below", 95)):
+        return Severity.HIGH, float(thresholds.get("high_below", 95))
+    if v < float(thresholds.get("medium_below", 97)):
+        return Severity.MEDIUM, float(thresholds.get("medium_below", 97))
+    if v < float(thresholds.get("info_below", 99)):
+        return Severity.INFO, float(thresholds.get("info_below", 99))
+    return Severity.NORMAL, float(thresholds.get("info_below", 99))
+
+
 if __name__ == "__main__":
     from pv_pipeline.availability import _classify_status
 
@@ -132,3 +156,16 @@ if __name__ == "__main__":
     mode3, _, _ = _detect_shutdown_time_mode(s_dt, s_st, force="status_only")
     assert mode3 == "STATUS_ONLY"
     print("[availability] _detect_shutdown_time_mode smoke OK")
+
+    # _severity_for_uptime test
+    from pv_pipeline.availability import _severity_for_uptime
+    from pv_pipeline.core import Severity
+
+    th = {"critical_below": 90, "high_below": 95, "medium_below": 97, "info_below": 99}
+    assert _severity_for_uptime(85.0, th) == (Severity.CRITICAL, 90)
+    assert _severity_for_uptime(92.0, th) == (Severity.HIGH, 95)
+    assert _severity_for_uptime(96.5, th) == (Severity.MEDIUM, 97)
+    assert _severity_for_uptime(98.0, th) == (Severity.INFO, 99)
+    assert _severity_for_uptime(99.5, th) == (Severity.NORMAL, 99)
+    assert _severity_for_uptime(float("nan"), th)[0] == Severity.NORMAL
+    print("[availability] _severity_for_uptime smoke OK")
