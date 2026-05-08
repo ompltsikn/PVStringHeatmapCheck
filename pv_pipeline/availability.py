@@ -5,13 +5,14 @@ Spec: docs/superpowers/specs/2026-05-08-m2e-hybrid-availability-design.md
 from __future__ import annotations
 
 import re
+import warnings
 from datetime import datetime
 from typing import Optional, Tuple
 
 import numpy as np
 import pandas as pd
 
-from pv_pipeline.core import Severity, M2Finding
+from pv_pipeline.core import Severity, M2Finding, SubModule
 
 
 def _classify_status(status: Optional[str], keymap: dict) -> str:
@@ -310,6 +311,83 @@ def _compute_string_proxy(
     return findings
 
 
+_PV_POWER_COL_RE = re.compile(r"PV\s*0*?(\d+)\s+Power\(kW\)", flags=re.I)
+
+
+def _detect_pv_power_cols(df: "pd.DataFrame", pv_max_allowed: int = 28) -> list:
+    cols = [c for c in df.columns if _PV_POWER_COL_RE.search(str(c))]
+    out = []
+    for c in cols:
+        m = _PV_POWER_COL_RE.search(str(c))
+        if m and int(m.group(1)) <= pv_max_allowed:
+            out.append(c)
+    out.sort(key=lambda x: int(_PV_POWER_COL_RE.search(x).group(1)))
+    return out
+
+
+def _estimate_interval_minutes(start_times: "pd.Series") -> float:
+    s = pd.to_datetime(start_times, errors="coerce").dropna().sort_values()
+    if len(s) < 2:
+        return 5.0
+    diffs = s.diff().dropna().dt.total_seconds() / 60.0
+    if len(diffs) == 0:
+        return 5.0
+    med = float(diffs.median())
+    if med <= 0 or med != med:
+        return 5.0
+    return med
+
+
+class M2eAvailability(SubModule):
+    """Hybrid M2e: inverter-level + string-proxy availability."""
+    name = "M2e_hybrid"
+
+    def run(self, combined_df: "pd.DataFrame", config: dict) -> list:
+        cfg = (config or {}).get("m2e", {}) or {}
+
+        required = ["Inverter_ID", "Start Time", "Inverter status"]
+        missing = [c for c in required if c not in combined_df.columns]
+        if missing:
+            warnings.warn(f"[M2e] missing required columns {missing}; skipping submodule")
+            return []
+
+        df = combined_df.copy()
+        df["Start Time"] = pd.to_datetime(df["Start Time"], errors="coerce")
+
+        keymap = cfg.get("inverter_status_map", {}) or {}
+        df["_status_class"] = df["Inverter status"].apply(lambda s: _classify_status(s, keymap))
+        unknown_mask = df["_status_class"] == "UNKNOWN"
+        if unknown_mask.any():
+            unk = df.loc[unknown_mask, "Inverter status"].astype(str).value_counts().head(20)
+            warnings.warn(f"[M2e] UNKNOWN status values (top 20):\n{unk.to_string()}")
+
+        force = (cfg.get("shutdown_time_detection") or "auto")
+        sd_col = df["Inverter shutdown time"] if "Inverter shutdown time" in df.columns else None
+        st_col = df["Inverter startup time"] if "Inverter startup time" in df.columns else None
+        if sd_col is None or st_col is None:
+            mode, sd_parsed, st_parsed = "STATUS_ONLY", None, None
+        else:
+            mode, sd_parsed, st_parsed = _detect_shutdown_time_mode(sd_col, st_col, force=force)
+        print(f"[M2e] shutdown_time mode = {mode}")
+
+        interval_min = _estimate_interval_minutes(df["Start Time"])
+        inv_findings = _compute_inverter_availability(
+            df, mode=mode, cfg=cfg, interval_minutes=interval_min,
+            sd_parsed=sd_parsed, st_parsed=st_parsed,
+        )
+
+        pv_cols = _detect_pv_power_cols(df, pv_max_allowed=28)
+        if not pv_cols:
+            warnings.warn("[M2e] no PV power columns found; skipping string-proxy")
+            str_findings = []
+        else:
+            str_findings = _compute_string_proxy(
+                df, pv_cols=pv_cols, cfg=cfg, interval_minutes=interval_min,
+            )
+
+        return inv_findings + str_findings
+
+
 if __name__ == "__main__":
     from pv_pipeline.availability import _classify_status
 
@@ -419,3 +497,31 @@ if __name__ == "__main__":
     assert f0.severity.value in {"CRITICAL", "HIGH", "MEDIUM", "INFO"}
     assert f0.extra["n_events"] >= 1
     print("[availability] _compute_string_proxy smoke OK")
+
+    # M2eAvailability.run() end-to-end smoke
+    from pv_pipeline.availability import M2eAvailability
+
+    times = list(pd.date_range("2026-05-07 10:00", periods=6, freq="5min"))
+    rows = []
+    for t in times:
+        rows.append({"ManageObject": "x/Inv_A_201_IKN", "Inverter_ID": "WB02-INV01",
+                     "Start Time": t, "Inverter status": "Grid connected",
+                     "Inverter shutdown time": "-", "Inverter startup time": "-",
+                     "PV1 Power(kW)": 0.0, "PV2 Power(kW)": 5.0,
+                     "PV3 Power(kW)": 5.5, "PV4 Power(kW)": 4.8})
+    for t in times:
+        rows.append({"ManageObject": "x/Inv_A_202_IKN", "Inverter_ID": "WB02-INV02",
+                     "Start Time": t, "Inverter status": "Grid connected",
+                     "Inverter shutdown time": "-", "Inverter startup time": "-",
+                     "PV1 Power(kW)": 5.0, "PV2 Power(kW)": 5.0,
+                     "PV3 Power(kW)": 5.5, "PV4 Power(kW)": 4.8})
+    df_e2e = pd.DataFrame(rows)
+
+    from pv_pipeline.m2_config import DEFAULT_M2_CONFIG
+    sm = M2eAvailability()
+    res = sm.run(df_e2e, DEFAULT_M2_CONFIG)
+    assert isinstance(res, list)
+    sub_string = [f for f in res if f.sub_module == "M2e_string_proxy"]
+    assert len(sub_string) == 1
+    assert sub_string[0].pv_string == "PV1"
+    print("[availability] M2eAvailability.run() smoke OK")
