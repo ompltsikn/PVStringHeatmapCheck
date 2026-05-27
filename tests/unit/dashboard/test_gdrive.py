@@ -4,6 +4,8 @@ from datetime import date
 from io import BytesIO
 from unittest.mock import Mock
 
+import pytest
+
 from pv_pipeline.dashboard.data.gdrive import (
     DriveArtifact,
     _resolve_folder_id,
@@ -143,3 +145,83 @@ def test_download_artifact_returns_bytesio_from_media_request():
 
     assert out.getvalue() == b"payload"
     fake_files.get_media.assert_called_once_with(fileId="abc")
+
+
+def test_list_artifacts_uses_public_manifest_with_manual_findings_columns(
+    monkeypatch,
+    tmp_path,
+):
+    manifest = tmp_path / "manifest.csv"
+    manifest.write_text(
+        "\n".join([
+            "date,file_csv,baseline_csv_file_id,findings_xlsx_url,findings_jsonl_file_id",
+            (
+                "2026-05-14,baseline/2026-05/2026-05-14.csv,"
+                "baseline-id,https://drive.google.com/file/d/xlsx-id/view,jsonl-id"
+            ),
+        ]),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        "pv_pipeline.dashboard.data.gdrive._streamlit_secrets",
+        lambda: {"gdrive_public": {"manifest_csv_path": str(manifest)}},
+    )
+
+    xlsx = list_artifacts("findings")
+    jsonl = list_artifacts("findings_jsonl")
+    baseline = list_artifacts("baseline_csv")
+
+    assert xlsx == {
+        date(2026, 5, 14): DriveArtifact(
+            date=date(2026, 5, 14),
+            file_id="https://drive.google.com/uc?export=download&id=xlsx-id",
+            name="m2_findings_20260514.xlsx",
+            kind="findings",
+        )
+    }
+    assert jsonl[date(2026, 5, 14)].file_id.endswith("id=jsonl-id")
+    assert baseline[date(2026, 5, 14)].name == "baseline/2026-05/2026-05-14.csv"
+    assert baseline[date(2026, 5, 14)].file_id.endswith("id=baseline-id")
+
+
+def test_public_manifest_can_keep_existing_file_csv_path_without_download_source(
+    monkeypatch,
+    tmp_path,
+):
+    manifest = tmp_path / "manifest.csv"
+    manifest.write_text(
+        "date,file_csv\n2026-05-14,baseline/2026-05/2026-05-14.csv\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        "pv_pipeline.dashboard.data.gdrive._streamlit_secrets",
+        lambda: {"gdrive_public": {"manifest_csv_path": str(manifest)}},
+    )
+
+    artifacts = list_artifacts("baseline_csv")
+
+    assert artifacts[date(2026, 5, 14)] == DriveArtifact(
+        date=date(2026, 5, 14),
+        file_id="",
+        name="baseline/2026-05/2026-05-14.csv",
+        kind="baseline_csv",
+    )
+    with pytest.raises(ValueError, match="downloadable public URL or Drive file ID"):
+        download_artifact("")
+
+
+def test_download_artifact_reads_public_url_without_service(monkeypatch):
+    class _Response:
+        def __enter__(self):
+            return BytesIO(b"public-payload")
+
+        def __exit__(self, *_args):
+            return False
+
+    urlopen = Mock(return_value=_Response())
+    monkeypatch.setattr("pv_pipeline.dashboard.data.gdrive.urlopen", urlopen)
+
+    out = download_artifact("https://drive.google.com/uc?export=download&id=abc")
+
+    assert out.getvalue() == b"public-payload"
+    urlopen.assert_called_once()

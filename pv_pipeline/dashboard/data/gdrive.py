@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from io import BytesIO
 from typing import Any, Dict, Literal
+from urllib.request import urlopen
 
 from pv_pipeline.dashboard.data.loader import (
     parse_baseline_csv_date,
@@ -17,6 +18,45 @@ from pv_pipeline.dashboard.data.loader import (
 
 ArtifactKind = Literal["findings", "findings_jsonl", "baseline_csv"]
 FOLDER_MIME_TYPE = "application/vnd.google-apps.folder"
+PUBLIC_SOURCE_COLUMNS = {
+    "findings": (
+        "findings_xlsx_file_id",
+        "findings_xlsx_url",
+        "m2_findings_xlsx_file_id",
+        "m2_findings_xlsx_url",
+        "xlsx_file_id",
+        "xlsx_url",
+        "file_xlsx",
+        "file_xlsx_url",
+    ),
+    "findings_jsonl": (
+        "findings_jsonl_file_id",
+        "findings_jsonl_url",
+        "m2_findings_jsonl_file_id",
+        "m2_findings_jsonl_url",
+        "jsonl_file_id",
+        "jsonl_url",
+        "file_jsonl",
+        "file_jsonl_url",
+    ),
+    "baseline_csv": (
+        "baseline_csv_file_id",
+        "baseline_csv_url",
+        "baseline_file_id",
+        "baseline_url",
+        "file_csv_id",
+        "file_csv_url",
+        "csv_file_id",
+        "csv_url",
+        "file_csv",
+    ),
+}
+PUBLIC_NAME_COLUMNS = {
+    "findings": ("findings_xlsx_name", "findings_xlsx_path", "file_xlsx"),
+    "findings_jsonl": ("findings_jsonl_name", "findings_jsonl_path", "file_jsonl"),
+    "baseline_csv": ("baseline_csv_name", "baseline_csv_path", "file_csv"),
+}
+DRIVE_FILE_ID_RE = re.compile(r"^[A-Za-z0-9_-]{3,}$")
 
 
 @dataclass(frozen=True)
@@ -35,6 +75,10 @@ def _streamlit_secrets() -> Any:
 
 def _gdrive_secrets() -> Any:
     return _streamlit_secrets()["gdrive"]
+
+
+def _public_manifest_secrets() -> dict:
+    return _as_dict(_as_dict(_streamlit_secrets()).get("gdrive_public", {}))
 
 
 def _drive_client(service_account_json: str | None = None):
@@ -62,6 +106,123 @@ def _as_dict(value: Any) -> dict:
         return dict(value)
     except Exception:
         return {}
+
+
+def _public_manifest_location(cfg: dict | None = None) -> str:
+    cfg = _public_manifest_secrets() if cfg is None else cfg
+    return str(cfg.get("manifest_csv_url") or cfg.get("manifest_csv_path") or "").strip()
+
+
+def _has_service_account_config() -> bool:
+    try:
+        cfg = _as_dict(_gdrive_secrets())
+    except Exception:
+        return False
+    return bool(
+        cfg.get("service_account_json")
+        and (cfg.get("folder_id") or cfg.get("findings_folder_id") or cfg.get("baseline_folder_id"))
+    )
+
+
+def _clean_manifest_cell(value: Any) -> str:
+    if value is None:
+        return ""
+    text = str(value).strip()
+    if text.lower() in {"", "nan", "nat", "none"}:
+        return ""
+    return text
+
+
+def _manifest_row(row: Any) -> dict[str, str]:
+    return {str(key).strip().lower(): _clean_manifest_cell(value) for key, value in row.items()}
+
+
+def _first_manifest_value(row: dict[str, str], columns: tuple[str, ...]) -> str:
+    for column in columns:
+        value = row.get(column)
+        if value:
+            return value
+    return ""
+
+
+def _parse_manifest_date(row: dict[str, str]) -> date | None:
+    raw = _first_manifest_value(row, ("date", "source_date", "day"))
+    if not raw:
+        return None
+    for fmt in ("%Y-%m-%d", "%Y%m%d"):
+        try:
+            return datetime.strptime(raw[:10] if fmt == "%Y-%m-%d" else raw, fmt).date()
+        except ValueError:
+            continue
+    return None
+
+
+def _extract_drive_file_id(source: str) -> str:
+    for pattern in (r"/d/([^/?#]+)", r"[?&]id=([^&#]+)"):
+        match = re.search(pattern, source)
+        if match:
+            return match.group(1)
+    return ""
+
+
+def _public_download_url(source: str) -> str:
+    value = _clean_manifest_cell(source)
+    if not value:
+        return ""
+    if value.startswith(("http://", "https://")):
+        file_id = _extract_drive_file_id(value)
+        if file_id:
+            return f"https://drive.google.com/uc?export=download&id={file_id}"
+        return value
+    if "/" in value or "\\" in value or "." in value:
+        return ""
+    if DRIVE_FILE_ID_RE.match(value):
+        return f"https://drive.google.com/uc?export=download&id={value}"
+    return ""
+
+
+def _artifact_name(kind: ArtifactKind, day: date, row: dict[str, str]) -> str:
+    name = _first_manifest_value(row, PUBLIC_NAME_COLUMNS[kind])
+    if name:
+        return name
+    if kind == "findings":
+        return f"m2_findings_{day:%Y%m%d}.xlsx"
+    if kind == "findings_jsonl":
+        return f"m2_findings_{day:%Y%m%d}.jsonl"
+    return f"{day:%Y-%m-%d}.csv"
+
+
+def _read_public_manifest(cfg: dict) -> Any:
+    import pandas as pd  # noqa: WPS433
+
+    location = _public_manifest_location(cfg)
+    if not location:
+        raise KeyError("gdrive_public must define manifest_csv_url or manifest_csv_path.")
+    return pd.read_csv(location)
+
+
+def _list_public_manifest_artifacts(
+    kind: ArtifactKind,
+    cfg: dict | None = None,
+) -> Dict[date, DriveArtifact]:
+    cfg = _public_manifest_secrets() if cfg is None else cfg
+    manifest = _read_public_manifest(cfg)
+    artifacts: Dict[date, DriveArtifact] = {}
+    for _index, raw_row in manifest.iterrows():
+        row = _manifest_row(raw_row)
+        parsed = _parse_manifest_date(row)
+        if parsed is None:
+            continue
+        source_value = _first_manifest_value(row, PUBLIC_SOURCE_COLUMNS[kind])
+        source = _public_download_url(source_value)
+        name = _artifact_name(kind, parsed, row)
+        if kind != "baseline_csv" and not source:
+            continue
+        artifact = DriveArtifact(date=parsed, file_id=source, name=name, kind=kind)
+        existing = artifacts.get(parsed)
+        if existing is None or (not existing.file_id and artifact.file_id):
+            artifacts[parsed] = artifact
+    return dict(sorted(artifacts.items()))
 
 
 def _resolve_folder_id(
@@ -128,6 +289,14 @@ def list_artifacts(
     """List dashboard artifacts from Drive, keyed by parsed date."""
     if kind not in {"findings", "findings_jsonl", "baseline_csv"}:
         raise ValueError(f"Unsupported artifact kind: {kind!r}")
+    if service is None and folder_id is None:
+        public_cfg = _public_manifest_secrets()
+        if _public_manifest_location(public_cfg):
+            try:
+                return _list_public_manifest_artifacts(kind, public_cfg)
+            except Exception:
+                if not _has_service_account_config():
+                    raise
     service = service or _drive_client()
     folder = _folder_id(kind, folder_id)
     parser = {
@@ -159,6 +328,11 @@ def list_artifacts(
 
 def download_artifact(file_id: str, *, service: Any | None = None) -> BytesIO:
     """Download one Drive artifact into memory."""
+    if not file_id:
+        raise ValueError("Manifest row must define a downloadable public URL or Drive file ID.")
+    if service is None and file_id.startswith(("http://", "https://")):
+        with urlopen(file_id) as response:
+            return BytesIO(response.read())
     service = service or _drive_client()
     request = service.files().get_media(fileId=file_id)
     if hasattr(request, "getvalue"):

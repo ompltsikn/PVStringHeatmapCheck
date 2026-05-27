@@ -4,7 +4,18 @@ Streamlit dashboard untuk output M2 pipeline.
 
 ## Data Files
 
-Dashboard bisa membaca dua Google Drive folder terpisah:
+Dashboard mendukung dua mode data source:
+
+1. Public manifest mode: gratis, tanpa Google Cloud Console. Manifest Google
+   Sheet dipublish sebagai CSV dan berisi public Drive URL/file ID untuk tiap
+   tanggal.
+2. Service account mode: fallback lama, memakai Google Drive API dan folder ID.
+
+Kalau `[gdrive_public]` berisi `manifest_csv_url` atau `manifest_csv_path`,
+dashboard memakai public manifest. Kalau tidak ada, dashboard memakai `[gdrive]`
+service account seperti sebelumnya.
+
+Data yang didukung:
 
 - Findings/output folder:
   - `m2_findings_YYYYMMDD.xlsx` dari folder `outputs/`
@@ -31,7 +42,27 @@ streamlit run streamlit_app.py
 ```
 
 Copy `.streamlit/secrets.toml.example` ke `.streamlit/secrets.toml`, lalu isi
-password, folder ID, dan service account JSON.
+password dan salah satu mode data source.
+
+Public manifest mode:
+
+```toml
+[gdrive_public]
+manifest_csv_url = "https://docs.google.com/spreadsheets/d/e/.../pub?output=csv"
+```
+
+Kolom manifest minimal mengikuti file `manifest.csv` dari baseline. Kolom baru
+bisa ditambahkan manual di Google Sheet yang sama, tanpa membuat manifest baru:
+
+```csv
+date,file_csv,baseline_csv_file_id,findings_xlsx_file_id,findings_jsonl_file_id
+2026-05-14,baseline/2026-05/2026-05-14.csv,DRIVE_ID_CSV,DRIVE_ID_XLSX,DRIVE_ID_JSONL
+```
+
+Alternatif kolom `*_url` juga didukung, misalnya `baseline_csv_url`,
+`findings_xlsx_url`, dan `findings_jsonl_url`.
+
+Service account fallback:
 
 ```toml
 [gdrive]
@@ -50,5 +81,7 @@ tetap didukung sebagai fallback.
 Entry point: `streamlit_app.py`.
 
 Secrets di Streamlit Cloud mengikuti format `.streamlit/secrets.toml.example`.
-Share kedua Google Drive folder ke `client_email` service account dengan
+Untuk public manifest mode, set file data Google Drive ke "Anyone with the link
+can view", lalu publish Google Sheet manifest sebagai CSV. Untuk service account
+mode, share kedua Google Drive folder ke `client_email` service account dengan
 minimal Viewer permission.

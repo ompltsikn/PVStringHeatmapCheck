@@ -1,5 +1,46 @@
 # Google Drive Setup
 
+## Public Manifest Mode
+
+Mode ini tidak butuh Google Cloud Console dan cocok untuk Streamlit Community
+Cloud.
+
+1. Upload file data ke Google Drive.
+2. Set file data yang akan dibaca dashboard ke "Anyone with the link can view".
+3. Buka manifest Google Sheet yang sudah ada.
+4. Tambahkan kolom URL/file ID di sheet yang sama.
+5. Publish sheet sebagai CSV.
+6. Isi Streamlit secrets:
+
+```toml
+[gdrive_public]
+manifest_csv_url = "https://docs.google.com/spreadsheets/d/e/.../pub?output=csv"
+```
+
+Manifest lama dari baseline tetap boleh dipakai. Kolom `file_csv` yang berisi
+path seperti `baseline/2026-05/2026-05-14.csv` dipakai sebagai nama/path
+display. Agar file bisa didownload tanpa API, tambahkan salah satu kolom berikut:
+
+```csv
+date,file_csv,baseline_csv_file_id,findings_xlsx_file_id,findings_jsonl_file_id
+2026-05-14,baseline/2026-05/2026-05-14.csv,DRIVE_ID_CSV,DRIVE_ID_XLSX,DRIVE_ID_JSONL
+```
+
+Atau pakai public sharing URL:
+
+```csv
+date,file_csv,baseline_csv_url,findings_xlsx_url,findings_jsonl_url
+2026-05-14,baseline/2026-05/2026-05-14.csv,https://drive.google.com/file/d/.../view,https://drive.google.com/file/d/.../view,https://drive.google.com/file/d/.../view
+```
+
+Kolom findings boleh kosong per tanggal. Dashboard tetap memilih xlsx sebagai
+primary input jika `findings_xlsx_*` tersedia, dan memakai jsonl hanya sebagai
+fallback Findings-only.
+
+## Service Account Mode
+
+Mode ini tetap didukung untuk deployment lama.
+
 1. Buat Google Cloud project.
 2. Enable Google Drive API.
 3. Buat service account.

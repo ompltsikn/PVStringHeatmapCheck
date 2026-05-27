@@ -2,6 +2,7 @@
 
 - URL loads and login form appears.
 - Shared password opens Overview.
+- Public manifest URL loads without requiring service account secrets.
 - Overview KPI cards render for selected date range.
 - Findings per WB and per detector charts render.
 - Heatmap page loads one `YYYY-MM-DD.csv`, inverter dropdown is populated, and matplotlib heatmap renders.
