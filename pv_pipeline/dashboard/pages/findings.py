@@ -58,6 +58,8 @@ def main() -> None:
         st.rerun()
 
     result = cached_findings_range(start, end)
+    for err in result.errors:
+        st.error(err)
     findings = normalize_findings_df(result.sheets.get("Findings", pd.DataFrame()))
     if findings.empty:
         st.info("Tidak ada findings untuk date range ini.")

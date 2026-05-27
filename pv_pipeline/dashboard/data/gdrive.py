@@ -113,10 +113,39 @@ def _public_manifest_location(cfg: dict | None = None) -> str:
     return str(cfg.get("manifest_csv_url") or cfg.get("manifest_csv_path") or "").strip()
 
 
+def _config_bool(value: Any, *, default: bool) -> bool:
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    text = str(value).strip().lower()
+    if text in {"0", "false", "no", "off", "disabled"}:
+        return False
+    if text in {"1", "true", "yes", "on", "enabled"}:
+        return True
+    return default
+
+
+def _service_account_enabled(cfg: Any | None = None) -> bool:
+    cfg = _as_dict(_gdrive_secrets()) if cfg is None else _as_dict(cfg)
+    if "use_service_account" in cfg:
+        return _config_bool(cfg.get("use_service_account"), default=True)
+    return _config_bool(cfg.get("service_account_enabled"), default=True)
+
+
+def _service_account_enabled_from_secrets() -> bool:
+    try:
+        return _service_account_enabled(_gdrive_secrets())
+    except Exception:
+        return True
+
+
 def _has_service_account_config() -> bool:
     try:
         cfg = _as_dict(_gdrive_secrets())
     except Exception:
+        return False
+    if not _service_account_enabled(cfg):
         return False
     return bool(
         cfg.get("service_account_json")
@@ -297,6 +326,11 @@ def list_artifacts(
             except Exception:
                 if not _has_service_account_config():
                     raise
+        if not _service_account_enabled_from_secrets():
+            raise KeyError(
+                "Public manifest mode is required because [gdrive].use_service_account=false. "
+                "Configure [gdrive_public].manifest_csv_url or manifest_csv_path."
+            )
     service = service or _drive_client()
     folder = _folder_id(kind, folder_id)
     parser = {

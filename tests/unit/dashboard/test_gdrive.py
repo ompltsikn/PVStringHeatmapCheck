@@ -225,3 +225,41 @@ def test_download_artifact_reads_public_url_without_service(monkeypatch):
 
     assert out.getvalue() == b"public-payload"
     urlopen.assert_called_once()
+
+
+def test_list_artifacts_requires_public_manifest_when_service_account_disabled(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        "pv_pipeline.dashboard.data.gdrive._streamlit_secrets",
+        lambda: {
+            "gdrive": {
+                "use_service_account": False,
+                "findings_folder_id": "folder-id",
+            }
+        },
+    )
+
+    with pytest.raises(KeyError, match="use_service_account=false"):
+        list_artifacts("findings")
+
+
+def test_public_manifest_failure_does_not_fallback_to_disabled_service_account(
+    monkeypatch,
+    tmp_path,
+):
+    missing_manifest = tmp_path / "missing.csv"
+    monkeypatch.setattr(
+        "pv_pipeline.dashboard.data.gdrive._streamlit_secrets",
+        lambda: {
+            "gdrive_public": {"manifest_csv_path": str(missing_manifest)},
+            "gdrive": {
+                "use_service_account": False,
+                "findings_folder_id": "folder-id",
+                "service_account_json": "{}",
+            },
+        },
+    )
+
+    with pytest.raises(FileNotFoundError):
+        list_artifacts("findings")

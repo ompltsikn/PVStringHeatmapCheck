@@ -79,3 +79,29 @@ def test_load_findings_day_falls_back_to_jsonl_when_xlsx_fails(monkeypatch):
     assert list(sheets) == ["Findings"]
     assert sheets["Findings"].loc[0, "source"] == "jsonl"
     assert "bad xlsx" in error
+
+
+def test_cached_findings_range_returns_error_when_listing_fails(monkeypatch):
+    def _fail_listing(_kind):
+        raise KeyError("Public manifest mode is required")
+
+    monkeypatch.setattr(cache, "list_artifacts", _fail_listing)
+
+    result = cache.cached_findings_range(date(2026, 5, 14), date(2026, 5, 14))
+
+    assert result.sheets == {}
+    assert result.available_dates == []
+    assert result.errors == ["'Public manifest mode is required'"]
+
+
+def test_cached_baseline_csv_day_returns_error_when_listing_fails(monkeypatch):
+    def _fail_listing(_kind):
+        raise KeyError("Public manifest mode is required")
+
+    monkeypatch.setattr(cache, "list_artifacts", _fail_listing)
+
+    result = cache.cached_baseline_csv_day(date(2026, 5, 14))
+
+    assert result.dataframe.empty
+    assert result.available_dates == []
+    assert result.error == "'Public manifest mode is required'"

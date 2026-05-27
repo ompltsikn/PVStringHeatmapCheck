@@ -49,6 +49,9 @@ Public manifest mode:
 ```toml
 [gdrive_public]
 manifest_csv_url = "https://docs.google.com/spreadsheets/d/e/.../pub?output=csv"
+
+[gdrive]
+use_service_account = false
 ```
 
 Kolom manifest minimal mengikuti file `manifest.csv` dari baseline. Kolom baru
@@ -66,6 +69,7 @@ Service account fallback:
 
 ```toml
 [gdrive]
+use_service_account = true
 findings_folder_id = "folder-output-id"
 baseline_folder_id = "folder-baseline-id"
 service_account_json = '''

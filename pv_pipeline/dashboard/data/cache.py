@@ -83,8 +83,11 @@ def _load_findings_day(
 @_cache_data
 def cached_findings_range(start: date, end: date) -> LoadResult:
     """Load and concatenate findings xlsx files across a date range."""
-    artifacts = list_artifacts("findings")
-    jsonl_artifacts = list_artifacts("findings_jsonl")
+    try:
+        artifacts = list_artifacts("findings")
+        jsonl_artifacts = list_artifacts("findings_jsonl")
+    except Exception as exc:
+        return LoadResult(sheets={}, errors=[str(exc)])
     available = sorted(set(artifacts).union(jsonl_artifacts))
     per_day = {}
     missing = []
@@ -108,7 +111,10 @@ def cached_findings_range(start: date, end: date) -> LoadResult:
 @_cache_data
 def cached_baseline_csv_day(day: date) -> CsvLoadResult:
     """Load a single baseline CSV day for Heatmap."""
-    artifacts = list_artifacts("baseline_csv")
+    try:
+        artifacts = list_artifacts("baseline_csv")
+    except Exception as exc:
+        return CsvLoadResult(dataframe=pd.DataFrame(), error=str(exc))
     artifact = artifacts.get(day)
     if artifact is None:
         return CsvLoadResult(

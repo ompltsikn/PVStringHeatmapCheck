@@ -53,6 +53,8 @@ def main() -> None:
         st.rerun()
 
     result = cached_findings_range(start, end)
+    for err in result.errors:
+        st.error(err)
     if not result.sheets:
         st.info("Tidak ada workbook sheets untuk date range ini.")
         return

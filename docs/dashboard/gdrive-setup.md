@@ -15,6 +15,9 @@ Cloud.
 ```toml
 [gdrive_public]
 manifest_csv_url = "https://docs.google.com/spreadsheets/d/e/.../pub?output=csv"
+
+[gdrive]
+use_service_account = false
 ```
 
 Manifest lama dari baseline tetap boleh dipakai. Kolom `file_csv` yang berisi
@@ -37,6 +40,10 @@ Kolom findings boleh kosong per tanggal. Dashboard tetap memilih xlsx sebagai
 primary input jika `findings_xlsx_*` tersedia, dan memakai jsonl hanya sebagai
 fallback Findings-only.
 
+`use_service_account = false` mematikan fallback service account. Key
+`service_account_json` boleh tetap ada di secrets, tetapi tidak akan dipakai
+selama opsi ini false.
+
 ## Service Account Mode
 
 Mode ini tetap didukung untuk deployment lama.
@@ -50,6 +57,7 @@ Mode ini tetap didukung untuk deployment lama.
 
 ```toml
 [gdrive]
+use_service_account = true
 findings_folder_id = "folder-output-id"
 baseline_folder_id = "folder-baseline-id"
 service_account_json = '''
