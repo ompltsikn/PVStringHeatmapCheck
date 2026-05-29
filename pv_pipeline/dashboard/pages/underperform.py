@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import date, timedelta
 
 import pandas as pd
+from matplotlib.patches import Rectangle
 
 from pv_pipeline.dashboard.auth import require_auth
 from pv_pipeline.dashboard.data.cache import (
@@ -86,6 +87,58 @@ def _load_empty_map() -> dict:
         return {}
 
 
+def _highlight_heatmap_row(ax, pivot: pd.DataFrame, pv_string: str) -> bool:
+    """Draw an outline around the selected PV row in a Cell-3 heatmap."""
+    label = f"{str(pv_string).strip().upper()} Power(kW)"
+    if pivot is None or pivot.empty or label not in pivot.index:
+        return False
+    row_idx = list(pivot.index).index(label)
+    ax.add_patch(Rectangle(
+        (0, row_idx),
+        pivot.shape[1],
+        1,
+        facecolor="none",
+        edgecolor="#00A3FF",
+        linewidth=2.4,
+        zorder=8,
+    ))
+    return True
+
+
+def _render_selected_heatmap(
+    df: pd.DataFrame,
+    inverter_id: str,
+    pv_string: str,
+    empty_map: dict,
+) -> None:
+    import matplotlib.pyplot as plt  # noqa: WPS433
+    import streamlit as st  # noqa: WPS433
+
+    from pv_pipeline.viz import plot_single_inv_heatmap
+
+    st.subheader("Selected String Heatmap")
+    st.caption("Heatmap memakai logic Cell 3: peer-relative normalized PV power per timestamp.")
+    try:
+        pivot, _ = plot_single_inv_heatmap(
+            inverter_id,
+            df,
+            show=False,
+            close_after_show=False,
+            empty_pv_map=empty_map,
+        )
+        fig = plt.gcf()
+        ax = fig.axes[0] if fig.axes else plt.gca()
+        highlighted = _highlight_heatmap_row(ax, pivot, pv_string)
+        if not highlighted:
+            st.info(f"Row {pv_string} tidak ditemukan di heatmap baseline untuk {inverter_id}.")
+        st.pyplot(fig, clear_figure=True)
+        plt.close(fig)
+    except Exception as exc:
+        st.error("Gagal render heatmap selected string.")
+        with st.expander("Detail traceback"):
+            st.exception(exc)
+
+
 def _render_baseline_context(selected: pd.Series) -> None:
     import altair as alt  # noqa: WPS433
     import streamlit as st  # noqa: WPS433
@@ -141,6 +194,8 @@ def _render_baseline_context(selected: pd.Series) -> None:
     if "pv_current_a" in ts_df.columns:
         cols.append("pv_current_a")
     st.dataframe(ts_df[cols], use_container_width=True, height=260)
+
+    _render_selected_heatmap(result.dataframe, inverter_id, pv_string, empty_map)
 
     analysis = analyze_inverter_strings(
         result.dataframe,
