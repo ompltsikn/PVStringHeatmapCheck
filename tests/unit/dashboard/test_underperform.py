@@ -5,6 +5,7 @@ from datetime import date
 import pandas as pd
 import pytest
 
+from pv_pipeline.dashboard.pages.underperform import _highlight_heatmap_row
 from pv_pipeline.dashboard.data.underperform import (
     analyze_inverter_strings,
     build_string_timeseries,
@@ -128,3 +129,26 @@ def test_analyze_inverter_strings_returns_display_only_metrics():
     assert pv1["median_power_ratio_to_sibling"] == 1.0
     assert pv1["p10_power_ratio_to_sibling"] == pytest.approx(0.52)
     assert pv1["low_norm_pct"] == 50.0
+
+
+def test_highlight_heatmap_row_adds_outline_for_selected_pv():
+    import matplotlib.pyplot as plt
+
+    fig, ax = plt.subplots()
+    pivot = pd.DataFrame(
+        [[1.0, 2.0], [3.0, 4.0]],
+        index=["PV1 Power(kW)", "PV2 Power(kW)"],
+        columns=pd.date_range("2026-05-14 08:00", periods=2, freq="5min"),
+    )
+
+    try:
+        highlighted = _highlight_heatmap_row(ax, pivot, "PV2")
+
+        assert highlighted is True
+        assert len(ax.patches) == 1
+        patch = ax.patches[0]
+        assert patch.get_y() == 1
+        assert patch.get_height() == 1
+        assert patch.get_width() == 2
+    finally:
+        plt.close(fig)
