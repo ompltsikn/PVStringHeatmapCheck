@@ -1,5 +1,26 @@
 # Pemeriksaan Lapangan Sensor POA WS-2 dan WS-1
 
+> **DITINJAU ULANG 14 Oktober 2026 — sebagian dasar di bawah gugur; pakai daftar pengganti ini.**
+>
+> Kolom "POA" yang dianalisa ternyata bercampur jenis sensor: WS-3/WS-4/WS-5 dan WS-1 (Jan–Mei 2026) = **GHI**
+> (datar), WS-2 dan WS-1 (sejak Jun 2026) = **POA** (miring). Karena itu:
+>
+> - **WS-2 "+8–14 % sejak kembali Jun" dan "miring ~26°" gugur.** Selisih itu terutama efek kemiringan POA terhadap
+>   acuan GHI. Pembandingan langsung di WS-2 sendiri cocok dengan sensor miring 10° utara (POA/GHI siang cerah 1,056
+>   Jul, 1,040 Agu, 0,999 Sep; teori 1,046 / 1,026 / 0,998).
+> - **Yang tetap perlu diperiksa di WS-2:** dalam energi harian, POA WS-2 membaca **+6–7 %** di atas GHI WS-2 yang
+>   ditransposisi (Jun–Agu; +2,7 % Sep). Catat nomor seri dan konstanta sensitivitas **kedua** sensor (POA dan GHI)
+>   di logger, serta kemiringan dan arah sensor POA (harapan 10°, utara).
+> - **WS-1 "bayangan baru sejak Juni" adalah pergantian sumber.** Sampai Mei kolom WS-1 berisi GHI; sejak Juni
+>   berisi POA, dan sensor POA itu terbayangi ±11:20–12:50. Butir "benda di atas/utara sensor POA" tetap diperiksa —
+>   tetapi pertanyaan "kapan benda dipasang (1–10 Jun)" tidak berlaku lagi.
+> - **Pertanyaan baru ke tim SCADA** (jumlah baris berkas ekspor POA per bulan): **WS-3 POA tidak pernah berisi data**
+>   Des 2025–Sep 2026; **WS-4 POA berhenti awal Jan 2026** (Des 2025 masih penuh); **WS-1 POA kosong Des 2025–Mei
+>   2026**; WS-2 seluruh stasiun kosong Mar–Mei 2026. Apakah sensor POA WS-3/WS-4 terpasang dan tag-nya terkonfigurasi?
+> - Bagian 3 (**WS-3 naik ~6 % sekitar 10 Agu 2026**) tetap berlaku, sebagai perubahan pada sensor **GHI** WS-3.
+>
+> Rincian: `coba/Analisa_Data_Cuaca_September_20261014.md` dan `coba/analisa_poa_20261014/` (lokal).
+
 **Tanggal:** 2026-10-02
 **Untuk:** tim O&M / weather station PLTS-IKN
 **Versi isian (Word):** `docs/Pemeriksaan_Lapangan_WS1_WS2.docx`, dengan kolom "Hasil", identitas kunjungan, dan kotak

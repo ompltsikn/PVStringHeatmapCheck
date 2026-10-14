@@ -1,5 +1,21 @@
 # Draf Blok `pyranometer.koreksi` — untuk ditinjau
 
+> **DITANGGUHKAN 14 Oktober 2026 — jangan salin blok ini ke config.** Dasarnya (`Ringkasan_Usulan_Koreksi_POA.md`)
+> ditinjau ulang: kolom "POA" 2026 berisi GHI untuk WS-3, WS-4, WS-5, dan WS-1 sampai Mei; POA asli hanya WS-2 dan
+> WS-1 sejak Juni. Akibatnya untuk entri di bawah:
+>
+> - **WS-3 ×1,060** mengoreksi GHI WS-3 terhadap GHI WS-4/WS-5. Masih berguna bila basis analitik "GHI ditransposisi"
+>   dipilih — tetapi diterapkan ke GHI **sebelum** transposisi, dan format bloknya perlu menyebut jenis sensor per
+>   kolom (spesifikasi baru), bukan faktor pada "POA".
+> - **WS-1 dikecualikan sejak 2025-01-12** tidak tepat: kolom WS-1 Jan–Mei 2026 adalah GHI yang tidak terbayangi.
+>   Yang perlu ditandai hanya sensor POA WS-1 pada ±11:20–12:50 sejak Juni 2026.
+> - **"+1,6 % bias WS-2 masuk pengisi WB08–10"** berubah makna: itu terutama rasio POA (WS-2) terhadap GHI
+>   (pembanding), bukan bias kalibrasi WS-2.
+> - **Validasi "median terkoreksi ÷ mentah"** di bawah tetap benar sebagai uji loader, tidak sebagai dampak fisik.
+>
+> Pengganti sementara: pembanding tiga basis POA di `coba/analisa_poa_20261014/` (kolom apa adanya, POA asli + GHI
+> ditransposisi, semua GHI ditransposisi). Blok baru disusun sesudah basis dipilih.
+
 **Tanggal:** 3 Oktober 2026 · **Status:** DRAF. Blok ini **belum** ada di `config/site_geometry.yaml`; semua hasil
 masih memakai POA mentah. · **Sumber:** `docs/Ringkasan_Usulan_Koreksi_POA.md` (keputusan 3 dan 4) ·
 **Format:** `docs/superpowers/specs/2026-10-02-penerapan-koreksi-poa-loader-design.md` (loader membacanya sejak 3 Okt).

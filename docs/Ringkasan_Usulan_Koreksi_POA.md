@@ -1,5 +1,28 @@
 # Ringkasan Usulan Koreksi Sensor POA
 
+> **DITINJAU ULANG 14 Oktober 2026 — keputusan 1–4 di bawah DITANGGUHKAN; jangan terapkan.**
+>
+> Kolom "POA WS n" di `POA PLTS IKN 2026.xlsx` ternyata tidak semuanya sensor bidang modul. Dicocokkan dengan berkas
+> mentah bulanan (`Data Weather Station`), stempel waktu dan nilainya identik dengan: **WS-3 = GHI** (Jan–Agu 2026;
+> berkas POA WS-3 tak pernah berisi data), **WS-4 = GHI** (Jan–Agu 2026; POA WS-4 berhenti awal Jan 2026),
+> **WS-1 = GHI Jan–Mei, POA sejak Jun 2026**, **WS-2 = POA**, **WS-5 = `Total_Irradiance` = GHI** (skrip ekspor
+> sendiri mencatat alias itu). Uji fisika (rasio siang cerah terhadap WS-4, ayunan musiman miring-vs-datar) dan
+> pembandingan langsung POA/GHI di WS-2 (1,056 Jul, 1,040 Agu, 0,999 Sep = teori miring 10° utara) membenarkannya.
+> 2025: hanya sheet master, sumber tak tertelusur; uji fisika menunjukkan WS-4 2025 miring dan WS-5 datar.
+>
+> | Baris di tabel | Status sesudah tinjauan |
+> |---|---|
+> | WS-3 ×1,060 (1 Jan–10 Agu 2026) | **Tetap nyata, tetapi sebagai selisih GHI WS-3 terhadap GHI WS-4/WS-5** (sejenis). Bukan koreksi POA: WB06 butuh POA (GHI ditransposisi, atau sensor POA WS-3 yang merekam). Data Sep (percobaan, WS-3 Sep dari GHI) memperpanjang periode 2 menjadi 7 minggu: rel 1,026, tetap 1 bulan sah. |
+> | WS-5 tanpa koreksi | Tetap, sebagai GHI. |
+> | WS-2 2026 "indikasi ~0,90; miring ~26°" | **Gugur.** WS-2 satu-satunya POA asli; selisihnya terhadap acuan adalah efek kemiringan karena acuannya GHI. Sisa yang nyata: POA WS-2 ÷ GHI WS-2 tertransposisi = +6–7 % energi harian Jun–Agu (+2,7 % Sep) — selisih antar-sensor di stasiun yang sama, perlu diperiksa. |
+> | WS-4 "peka acuan" | Dijelaskan oleh campuran jenis sensor (2026 GHI, 2025 miring). |
+> | WS-1 "jangan dipakai" | **Sebagian.** Sensor POA WS-1 (sejak Jun) memang terbayangi ±11:20–12:50; tetapi "penghalang sejak Jun 2026" adalah pergantian sumber GHI → POA, bukan benda baru. GHI WS-1 Jan–Mei membaca ~6–14 % di bawah GHI WS-4. |
+>
+> **Pembanding basis POA untuk analitik** (`coba/analisa_poa_20261014/pembanding_poa.xlsx`, PR per WB Mei–Sep 2026):
+> sebaran PR antar-WB Jun–Sep 10–14 % dengan kolom apa adanya; 5–8 % dengan POA asli + GHI ditransposisi; **2,9–4,2 %
+> bila semua WS dari GHI ditransposisi**. Keputusan yang menggantikan 1–4: pilih basis POA analitik (lihat
+> `coba/Analisa_Data_Cuaca_September_20261014.md`); koreksi per sensor diturunkan ulang sesudah itu.
+
 **Tanggal:** 2 Oktober 2026 (status diperbarui 3 Oktober 2026) · **Untuk:** pemilik dokumen kalibrasi POA PLTS-IKN ·
 **Status:** bahan keputusan; belum ada koreksi yang diterapkan (loader sudah membaca blok `pyranometer.koreksi` sejak
 3 Okt 2026, tetapi config belum memuatnya). Draf blok: `docs/Draf_Blok_Koreksi_POA.md`.
