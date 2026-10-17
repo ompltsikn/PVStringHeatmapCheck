@@ -27,6 +27,7 @@ BUILDERS = {
     "_build_drive_probe_notebook": "pv_pipeline.drive_probe",
     "_build_spatial_correlation_notebook": "pv_pipeline.spatial_correlation",
     "_build_m2f_nb": "pv_pipeline.m2f.report",
+    "_build_peta_progress_cleaning_notebook": "peta_progress_cleaning",
 }
 
 # Pembangun lama tinggal di output_string/; pembangun notebook lebih baru

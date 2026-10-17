@@ -246,7 +246,9 @@ def main(argv=None) -> None:
         events = load_cleaning_report(str(a.checklist), {})
     ev = gabung_layout(events, pos)
     jadwal = load_cleaning_schedule(str(a.checklist))
-    teks = bangun_html(ev, pos, jadwal, a.checklist, date.today())
+    # WITA eksplisit: di Colab (UTC) date.today() mundur sehari sebelum 08.00 WITA.
+    hari_ini = pd.Timestamp.now(tz="Asia/Makassar").date()
+    teks = bangun_html(ev, pos, jadwal, a.checklist, hari_ini)
     a.keluaran.parent.mkdir(parents=True, exist_ok=True)
     a.keluaran.write_text(teks, encoding="utf-8")
     print(f"{len(ev):,} centang dari {len(jadwal)} sheet, {ev['string'].nunique():,}/{len(pos):,} string "
