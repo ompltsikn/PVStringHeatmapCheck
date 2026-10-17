@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="id">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Peta Progress Cleaning PLTS</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@500;600&display=swap">
+<!-- Dibangun oleh peta_progress_cleaning.py dari peta_progress_cleaning_templat.html; jangan disunting langsung. -->
+<style>
+:root {
+  --ground:#EEF1ED; --surface:#FBFCFA; --surface-2:#F4F6F2;
+  --ink:#13171A; --muted:#5C6570; --faint:#8A9490;
+  --line:#D3D8D2; --line-soft:#E2E6E0; --ok:#0E6B58;
+  --k0:#E5602A; --k1:#0E6B58; --k2:#4E9C86; --k3:#A6CFBF; --k4:#D9B56B; --k5:#C9D0CA;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,Segoe UI,sans-serif;
+  --serif:"IBM Plex Serif",Georgia,serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark) {
+  :root:not([data-theme="light"]) {
+    --ground:#0E1110; --surface:#161A18; --surface-2:#1C211E;
+    --ink:#E7EAE5; --muted:#9AA49D; --faint:#75817A;
+    --line:#2A302C; --line-soft:#222825; --ok:#4CC1A2;
+    --k0:#FF8A4C; --k1:#4CC1A2; --k2:#2E8A73; --k3:#245A4D; --k4:#8E6C2F; --k5:#2C332F;
+  }
+}
+:root[data-theme="dark"] {
+  --ground:#0E1110; --surface:#161A18; --surface-2:#1C211E;
+  --ink:#E7EAE5; --muted:#9AA49D; --faint:#75817A;
+  --line:#2A302C; --line-soft:#222825; --ok:#4CC1A2;
+  --k0:#FF8A4C; --k1:#4CC1A2; --k2:#2E8A73; --k3:#245A4D; --k4:#8E6C2F; --k5:#2C332F;
+}
+* { box-sizing:border-box; }
+body { margin:0; background:var(--ground); color:var(--ink); font-family:var(--sans);
+  font-size:15px; line-height:1.62; -webkit-font-smoothing:antialiased; }
+.wrap { max-width:1080px; margin:0 auto; padding:34px 16px 80px; }
+.mast { border-top:2px solid var(--ink); padding-top:16px; }
+.mast h1 { font-family:var(--serif); font-weight:600; font-size:clamp(26px,4vw,38px);
+  line-height:1.16; margin:0 0 6px; text-wrap:balance; letter-spacing:-.01em; }
+.mast .sub { color:var(--muted); font-size:15.5px; max-width:62ch; margin:0 0 18px; }
+.reg { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:1px;
+  background:var(--line); border:1px solid var(--line); font-family:var(--mono); font-size:11.5px; margin:0; }
+.reg div { background:var(--surface); padding:8px 11px; }
+.reg dt { color:var(--faint); text-transform:uppercase; letter-spacing:.07em; font-size:10px; }
+.reg dd { margin:2px 0 0; font-weight:500; }
+section { margin-top:44px; }
+h2 { font-family:var(--serif); font-size:20px; font-weight:600; margin:0 0 4px;
+  display:flex; align-items:baseline; gap:11px; }
+h2 .num { font-family:var(--mono); font-size:11px; font-weight:500; color:var(--faint); letter-spacing:.08em; flex:none; }
+.lede { color:var(--muted); margin:0 0 18px; max-width:66ch; }
+.split { display:grid; grid-template-columns:minmax(280px,440px) 1fr; gap:26px; align-items:start; }
+.mapcard { background:var(--surface); border:1px solid var(--line); padding:14px; }
+.mapcard > svg { display:block; width:100%; height:auto; }
+.caption { font-family:var(--mono); font-size:10.5px; color:var(--faint); margin:9px 0 0; line-height:1.5; }
+.panel { position:sticky; top:12px; display:flex; flex-direction:column; gap:14px; }
+.tgl { font-family:var(--mono); font-size:clamp(28px,4.4vw,40px); font-weight:600; line-height:1.05;
+  letter-spacing:-.02em; font-variant-numeric:tabular-nums; }
+.tgl small { display:block; font-size:12.5px; font-weight:400; color:var(--muted); letter-spacing:0;
+  margin-top:6px; font-family:var(--sans); line-height:1.45; }
+input[type=range] { width:100%; accent-color:var(--ok); margin:0; }
+.kendali { display:flex; flex-wrap:wrap; gap:6px; }
+button { font:inherit; font-size:12px; color:var(--ink); background:var(--surface-2);
+  border:1px solid var(--line); padding:4px 10px; cursor:pointer; }
+button:hover { border-color:var(--faint); }
+button[aria-pressed="true"] { background:var(--ink); color:var(--surface); border-color:var(--ink); }
+.kunci { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:4px 14px;
+  font-size:12px; color:var(--muted); }
+.kunci span { display:flex; align-items:center; gap:7px; }
+.kunci i { width:14px; height:7px; display:block; flex:none; }
+.kunci b { font-family:var(--mono); font-weight:500; color:var(--ink); margin-left:auto; }
+svg .batas { fill:none; stroke:var(--line); stroke-width:3; }
+svg .wbl text { font-family:var(--mono); font-size:22px; fill:var(--faint); text-anchor:middle;
+  paint-order:stroke; stroke:var(--surface); stroke-width:5px; font-weight:500; pointer-events:none; }
+svg .sb path { stroke:var(--faint); stroke-width:3; fill:none; }
+svg .sb text { font-family:var(--mono); font-size:22px; fill:var(--faint); text-anchor:middle; }
+#meja rect { fill:var(--k5); }
+#meja .k0 { fill:var(--k0); } #meja .k1 { fill:var(--k1); } #meja .k2 { fill:var(--k2); }
+#meja .k3 { fill:var(--k3); } #meja .k4 { fill:var(--k4); } #meja .k5 { fill:var(--k5); }
+#peta .sorot { fill:none; stroke:var(--ink); stroke-width:2; pointer-events:none; }
+#tip { position:fixed; pointer-events:none; background:var(--surface); border:1px solid var(--line);
+  padding:8px 10px; font-size:12px; line-height:1.45; box-shadow:0 4px 14px rgba(0,0,0,.12);
+  display:none; z-index:5; max-width:300px; }
+#tip b { font-family:var(--mono); font-weight:500; display:block; margin-bottom:2px; }
+#tip span { color:var(--muted); font-family:var(--mono); font-size:11px; display:block; }
+.figs { display:flex; flex-direction:column; gap:20px; }
+.headline { display:flex; align-items:baseline; gap:14px; flex-wrap:wrap; }
+.headline .big { font-family:var(--mono); font-size:clamp(40px,7vw,58px); font-weight:600; line-height:1;
+  letter-spacing:-.03em; font-variant-numeric:tabular-nums; color:var(--ok); }
+.headline .big small { font-size:.42em; font-weight:500; margin-left:2px; }
+.headline p { margin:0; color:var(--muted); font-size:13.5px; max-width:52ch; }
+table { border-collapse:collapse; width:100%; font-size:13.5px; }
+.scroll { overflow-x:auto; }
+th, td { text-align:left; padding:8px 12px 8px 0; border-bottom:1px solid var(--line-soft); vertical-align:top; }
+th { font-family:var(--mono); font-size:10px; font-weight:500; color:var(--faint); text-transform:uppercase;
+  letter-spacing:.08em; border-bottom:1px solid var(--line); white-space:nowrap; }
+td.n { font-family:var(--mono); font-variant-numeric:tabular-nums; white-space:nowrap; }
+td.n b { font-weight:600; }
+tr.hi td { background:var(--surface-2); }
+tr.hi td:first-child { box-shadow:inset 3px 0 0 var(--k0); padding-left:11px; }
+.wbt { font-size:12.5px; }
+.wbt th, .wbt td { padding:5px 8px 5px 0; }
+.wbt td.n { text-align:right; } .wbt th.n { text-align:right; }
+.m { font-family:var(--mono); font-size:.88em; }
+.tag { font-family:var(--mono); font-size:10px; color:var(--k0); border:1px solid var(--k0);
+  padding:0 5px; margin-left:6px; letter-spacing:.04em; white-space:nowrap; }
+.bar { display:inline-block; width:56px; height:6px; background:var(--line-soft); margin-right:8px; vertical-align:1px; }
+.bar i { display:block; height:100%; background:var(--ok); }
+.lebar { min-width:760px; }
+#gantt { display:block; width:100%; height:auto; }
+#gantt .gr { stroke:var(--line-soft); stroke-width:1; }
+#gantt .gr.th { stroke:var(--line); }
+#gantt .ax { font-family:var(--mono); font-size:10.5px; fill:var(--faint); }
+#gantt .wbn { font-family:var(--mono); font-size:11.5px; fill:var(--muted); }
+#gantt .garis { stroke:var(--line-soft); }
+#gantt .jw { fill:var(--surface-2); stroke:var(--line); stroke-width:1; }
+#gantt .kj { fill:var(--k1); cursor:pointer; }
+#gantt .kj:hover { fill:var(--k0); }
+#gantt .kini { stroke:var(--k0); stroke-dasharray:3 3; stroke-width:1.2; }
+#gantt .kini-t { fill:var(--k0); text-anchor:end; }
+.note { font-size:13px; color:var(--muted); border-top:1px solid var(--line); padding-top:14px; max-width:74ch; }
+.note p { margin:0 0 8px; } .note p:last-child { margin-bottom:0; }
+details summary { cursor:pointer; font-size:13.5px; color:var(--muted); margin-bottom:10px; }
+footer { margin-top:46px; border-top:2px solid var(--ink); padding-top:12px; font-family:var(--mono);
+  font-size:10.5px; color:var(--faint); display:flex; justify-content:space-between; gap:14px; flex-wrap:wrap; }
+@media (max-width:760px) { .split { grid-template-columns:1fr; } .panel { position:static; order:-1; } }
+</style>
+<body>
+<div class="wrap">
+
+<header class="mast">
+  <h1>Riwayat cleaning modul PV</h1>
+  <p class="sub">$n_centang centang cleaning dari $n_sheet sheet checklist, $t_awal sampai $t_akhir,
+  di atas layout $total string PLTS IKN.</p>
+  <dl class="reg">
+    <div><dt>Sumber</dt><dd>$sumber</dd></div>
+    <div><dt>Centang</dt><dd>$n_centang &middot; $n_hari hari kerja</dd></div>
+    <div><dt>Pernah dibersihkan</dt><dd>$n_pernah / $total string</dd></div>
+    <div><dt>Posisi</dt><dd>pusat meja DXF</dd></div>
+    <div><dt>Disusun</dt><dd>$disusun</dd></div>
+  </dl>
+</header>
+
+<section id="s01">
+  <h2><span class="num">01</span> Kondisi cleaning per tanggal</h2>
+  <p class="lede">Satu persegi = satu meja = satu string, di pusat mejanya. Warnanya = berapa hari sejak
+  string itu terakhir dicentang bersih, dihitung pada tanggal yang dipilih. Geser penggeser, lompat antar-hari
+  kerja, atau tekan <b>Putar</b> untuk memutar ulang seluruh riwayat.</p>
+
+  <div class="split">
+    <div class="mapcard">
+      $svg_peta
+      <p class="caption">Utara di atas. Persegi digambar sedikit lebih kecil dari meja aslinya
+      (14,95 &times; 4,87&nbsp;m) agar celah antar-meja terlihat. Arahkan kursor ke meja untuk nama string
+      dan riwayat cleaning-nya.</p>
+    </div>
+
+    <div class="panel">
+      <div class="tgl"><span id="tgl">&nbsp;</span><small id="ket">&nbsp;</small></div>
+      <input type="range" id="geser" min="0" max="$d_kini" value="$d_kini" step="1" aria-label="Pilih tanggal">
+      <div class="kendali">
+        <button type="button" id="mundur">&#9664; hari kerja</button>
+        <button type="button" id="putar" aria-pressed="false">Putar</button>
+        <button type="button" id="maju">hari kerja &#9654;</button>
+        <button type="button" id="kini">Hari ini</button>
+      </div>
+      <div class="kunci" id="kunci">
+        <span><i style="background:var(--k0)"></i>dicentang hari itu<b data-k="0">0</b></span>
+        <span><i style="background:var(--k1)"></i>1&ndash;30 hari<b data-k="1">0</b></span>
+        <span><i style="background:var(--k2)"></i>31&ndash;90 hari<b data-k="2">0</b></span>
+        <span><i style="background:var(--k3)"></i>91&ndash;180 hari<b data-k="3">0</b></span>
+        <span><i style="background:var(--k4)"></i>&gt; 180 hari<b data-k="4">0</b></span>
+        <span><i style="background:var(--k5)"></i>belum pernah<b data-k="5">0</b></span>
+      </div>
+      <div class="scroll">
+        <table class="wbt">
+          <thead><tr><th>WB</th><th class="n">String</th><th class="n">&le;&nbsp;30&nbsp;h</th><th class="n">31&ndash;180&nbsp;h</th><th class="n">&gt;&nbsp;180&nbsp;h</th><th class="n">Belum</th></tr></thead>
+          <tbody id="wbt"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2><span class="num">02</span> Progress per cycle</h2>
+  <p class="lede">Satu baris = satu sheet checklist, definisi cycle dari tim lapangan. <b>Jadwal</b> = rentang
+  kolom tanggal di sheet itu; <b>realisasi</b> = hari kerja pertama dan terakhir yang dicentang. Progress dihitung
+  dari string unik yang dicentang dibanding jumlah string di sheet.</p>
+  <div class="figs">
+    <div class="headline">
+      <div class="big">$pct_pernah<small>%</small></div>
+      <p>string pernah dicentang bersih minimal sekali &mdash; $n_pernah dari $total.
+      $n_belum belum pernah tercatat: $teks_belum.</p>
+    </div>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Sheet</th><th>WB</th><th>Jadwal</th><th>Realisasi</th><th>Hari kerja</th><th>String</th><th>Progress</th><th>Putaran</th></tr></thead>
+        <tbody>$baris_c</tbody>
+      </table>
+    </div>
+    <div class="note">
+      $teks_kosong
+      <p><b>Putaran</b> = centang dibagi string unik dalam satu sheet. 2,0&times; berarti tiap string dibersihkan dua kali
+      di sheet itu (sheet 2025 WB01&ndash;WB02 memuat dua putaran setahun).</p>
+      <p>Baris bertanda <span class="tag">berjalan</span> jadwalnya belum berakhir pada tanggal penyusunan.</p>
+    </div>
+  </div>
+</section>
+
+<section id="s03">
+  <h2><span class="num">03</span> Jadwal dan hari kerja</h2>
+  <p class="lede">Pita abu = jendela jadwal tiap sheet. Batang = hari kerja; tingginya sebanding dengan jumlah string
+  yang dicentang hari itu. Klik batang untuk membuka tanggal itu di peta.</p>
+  <div class="mapcard scroll"><div class="lebar">$svg_gantt</div></div>
+</section>
+
+<section>
+  <h2><span class="num">04</span> Rincian per tanggal</h2>
+  <p class="lede">Satu baris per tanggal, WB, dan sheet; terbaru di atas. Angka di belakang inverter = jumlah string.</p>
+  <details>
+    <summary>$n_hari hari kerja &middot; $n_centang centang</summary>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Tanggal</th><th>WB</th><th>Sheet</th><th>String</th><th>Inverter</th></tr></thead>
+        <tbody>$baris_t</tbody>
+      </table>
+    </div>
+  </details>
+</section>
+
+<footer><span>Peta Progress Cleaning &middot; PLTS IKN</span><span>peta_progress_cleaning.py &middot; $sumber</span></footer>
+</div>
+<div id="tip" role="tooltip"></div>
+<script>
+const STR = $data_str;
+const WB = $data_wb, KERJA = $data_kerja;
+const T0 = Date.parse('$t0_iso' + 'T00:00:00Z'), DKINI = $d_kini, MW = $meja_w, MH = $meja_h;
+const BLN = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+const NS = 'http://www.w3.org/2000/svg';
+const peta = document.getElementById('peta'), meja = document.getElementById('meja');
+const geser = document.getElementById('geser'), tip = document.getElementById('tip');
+const putar = document.getElementById('putar');
+const KERJA_SET = new Set(KERJA);
+
+function tgl(d) {
+  const t = new Date(T0 + d * 864e5);
+  return t.getUTCDate() + ' ' + BLN[t.getUTCMonth()] + ' ' + t.getUTCFullYear();
+}
+function ribuan(n) { return n.toLocaleString('id-ID'); }
+
+const R = STR.map(function (s) {
+  const r = document.createElementNS(NS, 'rect');
+  r.setAttribute('x', (s[0] - MW / 2).toFixed(1)); r.setAttribute('y', (s[1] - MH / 2).toFixed(1));
+  r.setAttribute('width', MW); r.setAttribute('height', MH);
+  meja.appendChild(r);
+  return r;
+});
+const sorot = document.createElementNS(NS, 'rect');
+sorot.setAttribute('class', 'sorot'); sorot.setAttribute('width', MW + 6); sorot.setAttribute('height', MH + 6);
+sorot.style.display = 'none'; peta.appendChild(sorot);
+
+function terakhir(s, d) { let t = -1; for (const x of s[4]) { if (x <= d) t = x; else break; } return t; }
+function kelas(t, d) {
+  if (t < 0) return 5;
+  const a = d - t;
+  return a === 0 ? 0 : a <= 30 ? 1 : a <= 90 ? 2 : a <= 180 ? 3 : 4;
+}
+
+function tampilkan(d) {
+  const n = [0, 0, 0, 0, 0, 0];
+  const per = WB.map(function () { return [0, 0, 0, 0, 0, 0]; });
+  STR.forEach(function (s, i) {
+    const k = kelas(terakhir(s, d), d);
+    R[i].setAttribute('class', 'k' + k);
+    n[k]++; per[s[3]][k]++;
+  });
+  document.getElementById('tgl').firstChild.nodeValue = tgl(d);
+  document.querySelectorAll('#kunci b').forEach(function (b) { b.textContent = ribuan(n[+b.dataset.k]); });
+  let ket;
+  if (KERJA_SET.has(d)) {
+    const wbHari = per.map(function (p, i) { return p[0] ? WB[i] + ' ' + p[0] : ''; }).filter(Boolean).join(', ');
+    ket = ribuan(n[0]) + ' string dicentang hari ini (' + wbHari + ').';
+  } else {
+    const lalu = KERJA.filter(function (x) { return x < d; });
+    ket = lalu.length ? 'Tidak ada centang. Hari kerja terakhir ' + tgl(lalu[lalu.length - 1]) + '.'
+                      : 'Belum ada centang sampai tanggal ini.';
+  }
+  document.getElementById('ket').textContent = ket;
+  document.getElementById('wbt').innerHTML = per.map(function (p, i) {
+    const tot = p.reduce(function (a, b) { return a + b; }, 0);
+    return '<tr><td class="m">' + WB[i] + '</td><td class="n">' + ribuan(tot) + '</td><td class="n">' + ribuan(p[0] + p[1]) +
+      '</td><td class="n">' + ribuan(p[2] + p[3]) + '</td><td class="n">' + ribuan(p[4]) + '</td><td class="n">' + ribuan(p[5]) + '</td></tr>';
+  }).join('');
+}
+function atur(d) { geser.value = d; tampilkan(d); }
+
+geser.addEventListener('input', function () { tampilkan(+geser.value); });
+document.getElementById('kini').addEventListener('click', function () { berhenti(); atur(DKINI); });
+document.getElementById('mundur').addEventListener('click', function () {
+  berhenti(); const d = +geser.value, k = KERJA.filter(function (x) { return x < d; });
+  if (k.length) atur(k[k.length - 1]);
+});
+document.getElementById('maju').addEventListener('click', function () {
+  berhenti(); const d = +geser.value, k = KERJA.find(function (x) { return x > d; });
+  if (k !== undefined) atur(k);
+});
+let jalan = null;
+function berhenti() {
+  if (jalan) clearInterval(jalan);
+  jalan = null; putar.textContent = 'Putar'; putar.setAttribute('aria-pressed', 'false');
+}
+putar.addEventListener('click', function () {
+  if (jalan) { berhenti(); return; }
+  if (+geser.value >= DKINI) atur(KERJA[0]);
+  putar.textContent = 'Jeda'; putar.setAttribute('aria-pressed', 'true');
+  jalan = setInterval(function () {
+    const d = Math.min(DKINI, +geser.value + 3);
+    atur(d);
+    if (d >= DKINI) berhenti();
+  }, 60);
+});
+document.getElementById('gantt').addEventListener('click', function (e) {
+  const r = e.target.closest('rect.kj');
+  if (!r) return;
+  berhenti(); atur(+r.dataset.d);
+  document.getElementById('s01').scrollIntoView({ behavior: 'smooth' });
+});
+
+function baris(t) { return '<span>' + t + '</span>'; }
+peta.addEventListener('mousemove', function (e) {
+  const p = new DOMPoint(e.clientX, e.clientY).matrixTransform(peta.getScreenCTM().inverse());
+  let best = -1, d2 = 100;
+  for (let i = 0; i < STR.length; i++) {
+    const dd = (STR[i][0] - p.x) ** 2 + (STR[i][1] - p.y) ** 2;
+    if (dd < d2) { d2 = dd; best = i; }
+  }
+  if (best < 0) { sorot.style.display = 'none'; tip.style.display = 'none'; return; }
+  const s = STR[best], d = +geser.value, t = terakhir(s, d);
+  const lalu = s[4].filter(function (x) { return x <= d; }), nanti = s[4].length - lalu.length;
+  sorot.setAttribute('x', s[0] - MW / 2 - 3); sorot.setAttribute('y', s[1] - MH / 2 - 3); sorot.style.display = '';
+  tip.innerHTML = '<b>' + s[2] + '</b>' +
+    baris(t < 0 ? 'belum pernah dicentang s.d. ' + tgl(d) : 'terakhir ' + tgl(t) + ' &middot; ' + (d - t) + ' hari sebelum ' + tgl(d)) +
+    (lalu.length ? baris('riwayat ' + lalu.length + '&times;: ' + lalu.map(tgl).join(', ')) : '') +
+    (nanti ? baris('+' + nanti + ' sesudah tanggal ini') : '');
+  tip.style.display = 'block';
+  tip.style.left = Math.min(e.clientX + 14, innerWidth - tip.offsetWidth - 8) + 'px';
+  tip.style.top = Math.min(e.clientY + 14, innerHeight - tip.offsetHeight - 8) + 'px';
+});
+peta.addEventListener('mouseleave', function () { tip.style.display = 'none'; sorot.style.display = 'none'; });
+
+tampilkan(DKINI);
+</script>
+</body>
+</html>

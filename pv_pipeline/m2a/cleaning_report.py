@@ -188,8 +188,10 @@ def load_cleaning_report(
     """Parse checklist cleaning -> long DataFrame per (tanggal, string).
 
     Kolom output: date (normalized), inverter_id (``WBxx-INVyy``), wb, inv,
-    st, pv, mppt. ``pv`` = nomor PV sisi inverter: identity untuk WB01/WB02,
-    dari ``st_to_pv`` untuk WB lain (NaN + warning kalau mapping tidak ada).
+    st, pv, mppt, sheet. ``pv`` = nomor PV sisi inverter: identity untuk
+    WB01/WB02, dari ``st_to_pv`` untuk WB lain (NaN + warning kalau mapping
+    tidak ada). ``sheet`` = nama sheet asal, satu-satunya penanda cycle
+    (rentang tanggal antar-sheet satu WB boleh tumpang tindih).
     """
     st_to_pv = st_to_pv or {}
     xl = pd.ExcelFile(path)
@@ -252,6 +254,7 @@ def load_cleaning_report(
                     "st": st,
                     "pv": pv,
                     "mppt": mppt,
+                    "sheet": sheet,
                 })
 
     if unmapped:
@@ -262,9 +265,38 @@ def load_cleaning_report(
         )
     out = pd.DataFrame(
         events,
-        columns=["date", "inverter_id", "wb", "inv", "st", "pv", "mppt"],
+        columns=["date", "inverter_id", "wb", "inv", "st", "pv", "mppt", "sheet"],
     )
     return out.sort_values(["date", "inverter_id", "st"], ignore_index=True)
+
+
+def load_cleaning_schedule(path: str) -> pd.DataFrame:
+    """Jendela jadwal per sheet checklist -> [sheet, wb, n_strings, start, end].
+
+    ``start``/``end`` = kolom tanggal pertama/terakhir sheet (rencana), bukan
+    hari kerja. Sheet tanpa satu centang pun tetap muncul -- dari
+    ``load_cleaning_report`` sheet seperti itu tak meninggalkan jejak.
+    """
+    xl = pd.ExcelFile(path)
+    rows: List[dict] = []
+    for sheet in xl.sheet_names:
+        m_sheet = SHEET_STS_RE.match(str(sheet).strip())
+        if not m_sheet:
+            continue
+        df = pd.read_excel(path, sheet_name=sheet, header=None)
+        hdr_row = _find_header_row(df)
+        if hdr_row is None:
+            continue
+        dates = pd.to_datetime(df.iloc[hdr_row, 3:], errors="coerce").dropna()
+        strings = df.iloc[hdr_row + 1:, 2].astype(str).str.strip()
+        rows.append({
+            "sheet": sheet,
+            "wb": int(m_sheet.group(1)),
+            "n_strings": int(strings.str.match(ST_RE).sum()),
+            "start": dates.min().normalize() if len(dates) else pd.NaT,
+            "end": dates.max().normalize() if len(dates) else pd.NaT,
+        })
+    return pd.DataFrame(rows, columns=["sheet", "wb", "n_strings", "start", "end"])
 
 
 def daily_cleaning_counts(events: pd.DataFrame) -> pd.Series:

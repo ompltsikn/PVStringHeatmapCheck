@@ -23,6 +23,7 @@ from pv_pipeline.m2a.cleaning_report import (
     classify_cleaning_intervals,
     daily_cleaning_counts,
     load_cleaning_report,
+    load_cleaning_schedule,
     parse_dc_cable_frame,
 )
 
@@ -190,6 +191,46 @@ def test_load_cleaning_report_identity_wb01_and_mapped_wb03(tmp_path):
     assert wb03.loc[1, "pv"] == 10
     assert wb03.loc[1, "mppt"] == 3
     assert pd.isna(wb03.loc[2, "pv"])
+
+
+def test_load_cleaning_report_menyimpan_nama_sheet(tmp_path):
+    """Satu WB punya beberapa sheet (``STS1 (2026)``, ``STS1 (2026 Cycle 2)``,
+    ...) dan rentang kolom tanggalnya boleh tumpang tindih, jadi cycle sebuah
+    event hanya bisa dikenali dari nama sheet-nya, bukan dari tanggalnya."""
+    path = _write_cleaning_xlsx(tmp_path / "cleaning.xlsx")
+    with pytest.warns(UserWarning):
+        events = load_cleaning_report(path, {})
+    assert events.groupby("wb")["sheet"].unique().map(list).to_dict() == {
+        1: ["STS1 (2025)"], 3: ["STS3"],
+    }
+
+
+def test_load_cleaning_schedule_memuat_sheet_tanpa_centang(tmp_path):
+    """Sheet yang dijadwalkan tapi tak satu pun dicentang (kasus STS7 asli,
+    20 Mar - 5 Apr 2026) tidak menghasilkan event -- jadwalnya hanya
+    terlihat lewat fungsi ini. Baris total di bawah tabel bukan string."""
+    path = tmp_path / "jadwal.xlsx"
+    sts7 = pd.DataFrame([
+        ["JADWAL CLEANING", None, None, None, None],
+        [None, None, None, None, None],
+        [None, None, None, "MARET 2026", None],
+        ["Zone", "Inverter", "String", datetime(2026, 3, 20), datetime(2026, 4, 5)],
+        ["STS7", "INV-701", "ST01", None, None],
+        [None, None, "ST02", None, None],
+        [None, "INV-702", "ST01", None, None],
+        [None, None, None, 0, 0],
+    ])
+    with pd.ExcelWriter(path) as writer:
+        sts7.to_excel(writer, sheet_name="STS7", header=False, index=False)
+        pd.DataFrame([["bukan checklist"]]).to_excel(
+            writer, sheet_name="Rekap", header=False, index=False,
+        )
+    jadwal = load_cleaning_schedule(str(path))
+    assert jadwal.to_dict("records") == [{
+        "sheet": "STS7", "wb": 7, "n_strings": 3,
+        "start": pd.Timestamp("2026-03-20"), "end": pd.Timestamp("2026-04-05"),
+    }]
+    assert load_cleaning_report(str(path), {}).empty
 
 
 def test_build_st_to_pv_and_daily_counts(tmp_path):
